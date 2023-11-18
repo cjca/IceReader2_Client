@@ -87,6 +87,7 @@ Error during Upload: Failed uploading: uploading error: exit status 1
 #include <main.h>
 #include <SPI.h>
 #include <RH_RF95.h>
+#include <RTCZero.h>
 #include <ArduinoLowPower.h>
 #include <DHT.h>
 #include <OneWire.h>
