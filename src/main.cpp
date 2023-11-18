@@ -1,4 +1,9 @@
-/*
+/* 
+IceReader2 Client - Copyright 2023, Curlvation, LLC
+All Rights Reserved
+
+ Pin Definitions
++---------------+
 
 All Pin Labels are GPIO Numbers
 Pin 0 = RX (Serial1 Input)
@@ -171,14 +176,14 @@ void setup() {
 
   while (!rf95.init()) {
     if (DEBUG) { Serial.println("[ERROR] StartUp - LoRa radio initalication failed"); }
-    while (1);
+    for (;;) {}
   }
   if (DEBUG) { Serial.println("[INFO] StartUp - LoRa radio initalication OK!"); }
 
   // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM
   if (!rf95.setFrequency(RF95_FREQ)) {
     if (DEBUG) { Serial.println("[ERROR] StartUp - LoRa setFrequency failed"); }
-    while (1);
+    for (;;) {}
   }
   if (DEBUG) { Serial.print("[INFO] StartUp - LoRa Set Freq to: "); Serial.println(RF95_FREQ); }
 
@@ -208,7 +213,6 @@ float checkBattery() {
 //---------------------------------------------------------------------------//
 
 void powerDown() {
-
   if (DEBUG) { Serial.println("[INFO] - Powering Down Microcontroller"); }
   digitalWrite(13, LOW);
   LowPower.deepSleep(READ_INTERVAL);
@@ -233,20 +237,19 @@ float readAirHumidity() {
 //---------------------------------------------------------------------------//
 
 void loop() {
-
-  //if (DEBUG) {
+  // if (DEBUG) {
   //  USBDevice.init();
   //  USBDevice.attach();
-  //}
+  // }
 
   // Build datagram
-  //SourceID:PacketVersion:PacketNum:AirTemp:AirHumidity:IceTemp
-  //000:0.0:000000:00.0:00.0:00.0
-  //1234567890123456789012345
+  // SourceID:PacketVersion:PacketNum:AirTemp:AirHumidity:IceTemp
+  // 000:0.0:000000:00.0:00.0:00.0
+  // 1234567890123456789012345
   rf95.setModeTx();
   digitalWrite(13, HIGH);
 
-  delay(1000); // Wait 1 second between transmits, could also 'sleep' here!
+  delay(1000);  // Wait 1 second between transmits, could also 'sleep' here!
 
   if (DEBUG) { Serial.println("[INFO] -------> Starting Transmission <-------"); }
 
@@ -266,20 +269,17 @@ void loop() {
     Serial.print("[INFO] Battery: "); Serial.println(battery);
   }
 
-  sprintf(radiopacket, "%0d:%2.1f:%06d:%04.1f:%04.1f:%04.1f:%3.2f", myID, packetVersion, packetnum, iceTempF, airTempF, humidity, battery);
+  snprintf(radiopacket, sizeof(radiopacket),
+    "%0d:%2.1f:%06d:%04.1f:%04.1f:%04.1f:%3.2f",
+    myID, packetVersion, packetnum, iceTempF, airTempF, humidity, battery);
 
   if (DEBUG) { Serial.print("[INFO] - Message To Send: "); Serial.println(radiopacket); }
 
   if (DEBUG) { Serial.println("[INFO] - Sending..."); }
   delay(10);
 
-// -- THIS SHOULD BE ALREADY DONE BY THE 'send'
-//  while(!rf95.waitCAD()) {
-//    if (DEBUG) { Serial.println("[WARN] - Channel Busy."); }
-//    delay(20);
-//  }
-
-  rf95.send((uint8_t *)radiopacket, 33);
+//  rf95.send((uint8_t *)radiopacket, 33);
+  rf95.send(reinterpret_cast<uint8_t *>(radiopacket), 33);
 
   if (DEBUG) { Serial.println("[INFO] - Waiting for Confirmation..."); }
   delay(10);
@@ -295,39 +295,10 @@ void loop() {
   rf95.sleep();
 
   digitalWrite(13, LOW);
-  delay(12000); // Pause for 12 seconds before powering down.
+  delay(12000);  // Pause for 12 seconds before powering down.
   if (DEBUG) {
     delay(READ_INTERVAL);
   } else {
     powerDown();
   }
 }
-
-
-/*
-
-  // Now wait for a reply
-  uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
-  uint8_t len = sizeof(buf);
-
-if (DEBUG) { Serial.println("Waiting for reply..."); }
-  if (rf95.waitAvailableTimeout(1000)) {
-    // Should be a reply message for us now
-    if (rf95.recv(buf, &len)) {
-      if (DEBUG) {
-        Serial.print("Got reply: ");
-        Serial.println((char*)buf);
-        Serial.print("RSSI: ");
-        Serial.println(rf95.lastRssi(), DEC);
-      }
-    } else {
-      if (DEBUG) { Serial.println("Receive failed"); }
-    }
-  } else {
-    if (DEBUG) { Serial.println("No reply, is there a listener around?"); }
-  }
-
-
-
-
-*/
