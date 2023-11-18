@@ -1,4 +1,4 @@
-/* 
+/*
 IceReader2 Client - Copyright 2023, Curlvation, LLC
 All Rights Reserved
 
