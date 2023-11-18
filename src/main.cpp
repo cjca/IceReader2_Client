@@ -84,21 +84,13 @@ Error during Upload: Failed uploading: uploading error: exit status 1
 */
 
 #include <Arduino.h>
+#include <main.h>
 #include <SPI.h>
 #include <RH_RF95.h>
 #include <ArduinoLowPower.h>
 #include <DHT.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
-
-float checkBattery();
-void powerDown();
-float readIceTemp();
-float readAirTemp();
-float readAirHumidity();
-
-#define VERSION 1.0
-#define DEBUG 0
 
 // Define Communication Pins
 #define RFM95_CS    8
