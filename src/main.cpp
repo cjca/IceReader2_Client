@@ -124,6 +124,10 @@ Error during Upload: Failed uploading: uploading error: exit status 1
 // 60 Minutes = 3600000
 #define READ_INTERVAL 600000
 
+#define single_frac(x) (int(10*(x-int(x))))
+#define double_frac(x) (int(100*(x-int(x))))
+
+
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
@@ -215,15 +219,31 @@ void powerDown() {
 
 float readIceTemp() {
   sensors.requestTemperatures();
-  return sensors.getTempFByIndex(0);
+  float temp = sensors.getTempFByIndex(0);
+  if (temp < 0) {
+    temp = 0.0;
+  }
+  return temp;
 }
 
 float readAirTemp() {
-  return dht.readTemperature(true);
+  float temp = dht.readTemperature(true);
+  if (isnan(temp)) {
+    temp = 0.0;
+  }
+  Serial.print("Temp: ");
+  Serial.println(temp);
+  return temp;
 }
 
 float readAirHumidity() {
-  return dht.readHumidity();
+  float value = dht.readHumidity();
+  if (isnan(value)) {
+    value = 0.0;
+  }
+  Serial.print("Humidity: ");
+  Serial.println(value);
+  return value;
 }
 
 //---------------------------------------------------------------------------//
@@ -256,15 +276,30 @@ void loop() {
   float battery = checkBattery();
 
   if (DEBUG) {
+    Serial.print("[INFO] myID: "); Serial.println(myID);
+    Serial.print("[INFO] packetVersion: "); Serial.println(packetVersion);
+    Serial.print("[INFO] packetNum: "); Serial.println(packetnum);
     Serial.print("[INFO] IceTemp: "); Serial.println(iceTempF);
     Serial.print("[INFO] AirTemp: "); Serial.println(airTempF);
     Serial.print("[INFO] Humidity: "); Serial.println(humidity);
     Serial.print("[INFO] Battery: "); Serial.println(battery);
   }
 
-  snprintf(radiopacket, sizeof(radiopacket),
-    "%0d:%2.1f:%06d:%04.1f:%04.1f:%04.1f:%3.2f",
-    myID, packetVersion, packetnum, iceTempF, airTempF, humidity, battery);
+  int res = snprintf(radiopacket, sizeof(radiopacket), 
+  "%0d:%1d.%1d:%06d:%02d.%1d:%02d.%1d:%02d.%1d:%1d.%2d", 
+  myID, 
+  int(packetVersion), single_frac(packetVersion), 
+  packetnum,
+  int(iceTempF), single_frac(iceTempF),
+  int(airTempF), single_frac(airTempF),
+  int(humidity), single_frac(humidity),
+  int(battery), double_frac(battery));
+  
+  Serial.print("Result of sprintf: ");
+  Serial.println(res);
+  // snprintf(radiopacket, sizeof(radiopacket),
+  //  "%0d:%2.1f:%06d:%04.1f:%04.1f:%04.1f:%3.2f",
+  //  myID, packetVersion, packetnum, iceTempF, airTempF, humidity, battery);
 
   if (DEBUG) { Serial.print("[INFO] - Message To Send: "); Serial.println(radiopacket); }
 
