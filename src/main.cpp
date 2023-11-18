@@ -139,7 +139,7 @@ DallasTemperature sensors(&oneWire);
 // We don't go above 999,999
 // At one read per minute, this gives us close to 2 years uptime without rollover.
 int packetnum = 1;
-float packetVersion = 1.1;
+float packetVersion = 1.2;
 
 //---------------------------------------------------------------------------//
 //---------------------------------------------------------------------------//
@@ -285,16 +285,16 @@ void loop() {
     Serial.print("[INFO] Battery: "); Serial.println(battery);
   }
 
-  int res = snprintf(radiopacket, sizeof(radiopacket), 
-  "%0d:%1d.%1d:%06d:%02d.%1d:%02d.%1d:%02d.%1d:%1d.%2d", 
-  myID, 
-  int(packetVersion), single_frac(packetVersion), 
+  int res = snprintf(radiopacket, sizeof(radiopacket),
+  "%0d:%1d.%1d:%06d:%02d.%1d:%02d.%1d:%02d.%1d:%1d.%2d",
+  myID,
+  int(packetVersion), single_frac(packetVersion),
   packetnum,
   int(iceTempF), single_frac(iceTempF),
   int(airTempF), single_frac(airTempF),
   int(humidity), single_frac(humidity),
   int(battery), double_frac(battery));
-  
+
   Serial.print("Result of sprintf: ");
   Serial.println(res);
   // snprintf(radiopacket, sizeof(radiopacket),
