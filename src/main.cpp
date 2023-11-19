@@ -2,6 +2,8 @@
 IceReader2 Client - Copyright 2023, Curlvation, LLC
 All Rights Reserved
 
+Coretex-M (m0) 32-bit processor
+
  Pin Definitions
 +---------------+
 
@@ -124,10 +126,6 @@ Error during Upload: Failed uploading: uploading error: exit status 1
 // 60 Minutes = 3600000
 #define READ_INTERVAL 600000
 
-#define single_frac(x) (int(10*(x-int(x))))
-#define double_frac(x) (int(100*(x-int(x))))
-
-
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
@@ -138,8 +136,9 @@ DallasTemperature sensors(&oneWire);
 // int on samd21 = Up to 2 Billion 2,147,483,647
 // We don't go above 999,999
 // At one read per minute, this gives us close to 2 years uptime without rollover.
-int packetnum = 1;
-float packetVersion = 1.2;
+uint32_t packetnum = 1;
+const uint8_t packetVersion = 2;
+const uint8_t myID = 3;
 
 //---------------------------------------------------------------------------//
 //---------------------------------------------------------------------------//
@@ -199,12 +198,12 @@ void setup() {
 
 //---------------------------------------------------------------------------//
 
-float checkBattery() {
+uint16_t checkBattery() {
   float measuredvbat = analogRead(VBATPIN);
   measuredvbat *= 2;    // we divided by 2, so multiply back
   measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
   measuredvbat /= 1024;  // convert to voltage
-  return(measuredvbat);
+  return static_cast<uint16_t>(measuredvbat*100);
 }
 
 //---------------------------------------------------------------------------//
@@ -217,63 +216,55 @@ void powerDown() {
 
 //---------------------------------------------------------------------------//
 
-float readIceTemp() {
+uint16_t readIceTemp() {
   sensors.requestTemperatures();
-  float temp = sensors.getTempFByIndex(0);
-  if (temp < 0) {
-    temp = 0.0;
+  float value = sensors.getTempFByIndex(0);
+  if (value < 0) {
+    return 0;
+  } else {
+    return static_cast<uint16_t>(value*100);
   }
-  return temp;
 }
 
-float readAirTemp() {
-  float temp = dht.readTemperature(true);
-  if (isnan(temp)) {
-    temp = 0.0;
+uint16_t readAirTemp() {
+  float value = dht.readTemperature(true);
+  if (isnan(value)) {
+    return 0;
+  } else {
+    return static_cast<uint16_t>(value*100);
   }
-  Serial.print("Temp: ");
-  Serial.println(temp);
-  return temp;
 }
 
-float readAirHumidity() {
+uint16_t readAirHumidity() {
   float value = dht.readHumidity();
   if (isnan(value)) {
-    value = 0.0;
+    return 0;
+  } else {
+    return static_cast<uint16_t>(value*100);
   }
-  Serial.print("Humidity: ");
-  Serial.println(value);
-  return value;
 }
 
 //---------------------------------------------------------------------------//
 //---------------------------------------------------------------------------//
 
 void loop() {
-  // if (DEBUG) {
-  //  USBDevice.init();
-  //  USBDevice.attach();
-  // }
-
   // Build datagram
-  // SourceID:PacketVersion:PacketNum:AirTemp:AirHumidity:IceTemp
-  // 000:0.0:000000:00.0:00.0:00.0
-  // 1234567890123456789012345
+  // SourceID:PacketVersion:PacketNum:AirTemp:AirHumidity:IceTemp:battery
+  // 00:00:000000:0000:0000:0000:000
+  // 123456789012345678901234567890123
   rf95.setModeTx();
   digitalWrite(13, HIGH);
 
   delay(1000);  // Wait 1 second between transmits, could also 'sleep' here!
-
   if (DEBUG) { Serial.println("[INFO] -------> Starting Transmission <-------"); }
 
-  // Note: Size 24. 23 Usable. End of Array is '\0'
-  char radiopacket[33] = "0:0.0:000000:00.0:00.0:00.0:0.00";
+  // Note: Size 32. 31 Usable. End of Array is '\0'
+  char radiopacket[32] = "00:00:000000:0000:0000:0000:000";
 
-  int myID = 3;
-  float iceTempF = readIceTemp();
-  float airTempF = readAirTemp();
-  float humidity = readAirHumidity();
-  float battery = checkBattery();
+  uint16_t iceTempF = readIceTemp();
+  uint16_t airTempF = readAirTemp();
+  uint16_t humidity = readAirHumidity();
+  uint16_t battery = checkBattery();
 
   if (DEBUG) {
     Serial.print("[INFO] myID: "); Serial.println(myID);
@@ -285,18 +276,10 @@ void loop() {
     Serial.print("[INFO] Battery: "); Serial.println(battery);
   }
 
-  int res = snprintf(radiopacket, sizeof(radiopacket),
-  "%0d:%1d.%1d:%06d:%02d.%1d:%02d.%1d:%02d.%1d:%1d.%2d",
-  myID,
-  int(packetVersion), single_frac(packetVersion),
-  packetnum,
-  int(iceTempF), single_frac(iceTempF),
-  int(airTempF), single_frac(airTempF),
-  int(humidity), single_frac(humidity),
-  int(battery), double_frac(battery));
+  snprintf(radiopacket, sizeof(radiopacket),
+  "%02u:%02u:%06u:%04u:%04u:%04u:%03u",
+  myID, packetVersion, packetnum, iceTempF, airTempF, humidity, battery);
 
-  Serial.print("Result of sprintf: ");
-  Serial.println(res);
   // snprintf(radiopacket, sizeof(radiopacket),
   //  "%0d:%2.1f:%06d:%04.1f:%04.1f:%04.1f:%3.2f",
   //  myID, packetVersion, packetnum, iceTempF, airTempF, humidity, battery);
@@ -314,7 +297,13 @@ void loop() {
   if (!rf95.waitPacketSent()) {
       if (DEBUG) { Serial.println("[ERROR] - Sending of message UNSUCCESSFUL"); }
   } else {
-    packetnum++;
+    // Our Packet number is included in the sent packet.  We only leave room
+    // for 6 numbers.  This resets it to keep the packet from overflowing.
+    if (packetnum >= 999999) {
+      packetnum = 1;
+    } else {
+      packetnum++;
+    }
     if (DEBUG) { Serial.println("[INFO] - Sending of message SUCCESSFUL"); }
   }
 
