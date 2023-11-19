@@ -211,8 +211,8 @@ uint16_t checkBattery() {
 void powerDown() {
   if (DEBUG) { Serial.println("[INFO] - Powering Down Microcontroller"); }
   digitalWrite(13, LOW);
-  // LowPower.deepSleep(READ_INTERVAL);
-  LowPower.sleep(READ_INTERVAL);
+  LowPower.deepSleep(READ_INTERVAL);
+  //  LowPower.sleep(READ_INTERVAL);
 }
 
 //---------------------------------------------------------------------------//
