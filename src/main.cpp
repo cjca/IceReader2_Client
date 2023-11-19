@@ -136,7 +136,7 @@ DallasTemperature sensors(&oneWire);
 // int on samd21 = Up to 2 Billion 2,147,483,647
 // We don't go above 999,999
 // At one read per minute, this gives us close to 2 years uptime without rollover.
-uint32_t packetnum = 1;
+uint16_t packetnum = 1;
 const uint8_t packetVersion = 2;
 const uint8_t myID = 3;
 
