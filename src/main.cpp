@@ -211,7 +211,8 @@ uint16_t checkBattery() {
 void powerDown() {
   if (DEBUG) { Serial.println("[INFO] - Powering Down Microcontroller"); }
   digitalWrite(13, LOW);
-  LowPower.deepSleep(READ_INTERVAL);
+  // LowPower.deepSleep(READ_INTERVAL);
+  LowPower.sleep(READ_INTERVAL);
 }
 
 //---------------------------------------------------------------------------//
@@ -219,6 +220,10 @@ void powerDown() {
 uint16_t readIceTemp() {
   sensors.requestTemperatures();
   float value = sensors.getTempFByIndex(0);
+  if (DEBUG) {
+    Serial.print("Ice Temp Value Received: ");
+    Serial.println(value);
+  }
   if (value < 0) {
     return 0;
   } else {
@@ -228,6 +233,10 @@ uint16_t readIceTemp() {
 
 uint16_t readAirTemp() {
   float value = dht.readTemperature(true);
+  if (DEBUG) {
+    Serial.print("Air Temp Value Received: ");
+    Serial.println(value);
+  }
   if (isnan(value)) {
     return 0;
   } else {
@@ -237,6 +246,10 @@ uint16_t readAirTemp() {
 
 uint16_t readAirHumidity() {
   float value = dht.readHumidity();
+  if (DEBUG) {
+    Serial.print("Humidity Value Received: ");
+    Serial.println(value);
+  }
   if (isnan(value)) {
     return 0;
   } else {
@@ -249,9 +262,9 @@ uint16_t readAirHumidity() {
 
 void loop() {
   // Build datagram
-  // SourceID:PacketVersion:PacketNum:AirTemp:AirHumidity:IceTemp:battery
+  // SourceID:PacketVersion:PacketNum:IceTemp:AirTemp:AirHumidity:battery
   // 00:00:000000:0000:0000:0000:000
-  // 123456789012345678901234567890123
+  // 12345678901234567890123456789012
   rf95.setModeTx();
   digitalWrite(13, HIGH);
 
