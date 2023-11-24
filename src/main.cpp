@@ -94,6 +94,8 @@ Error during Upload: Failed uploading: uploading error: exit status 1
 #include <DHT.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <Adafruit_NeoPixel.h>
+
 
 // Define Communication Pins
 #define RFM95_CS    8
@@ -103,6 +105,7 @@ Error during Upload: Failed uploading: uploading error: exit status 1
 #define VBATPIN A7
 #define airThermometerPin 5
 #define iceThermometerPin 6
+#define PIXEL_PIN 10
 
 // Define Frequency for LoRa Radio
 #define RF95_FREQ 433.0
@@ -132,6 +135,8 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 DHT dht(airThermometerPin, DHT22);
 OneWire oneWire(iceThermometerPin);
 DallasTemperature sensors(&oneWire);
+
+Adafruit_NeoPixel pixel(1, PIXEL_PIN, NEO_RGB + NEO_KHZ800);
 
 // int on samd21 = Up to 2 Billion 2,147,483,647
 // We don't go above 999,999
@@ -163,6 +168,8 @@ void setup() {
     Serial.print("[INFO] StartUp - Resetting LoRa Radio... ");
   }
 
+  pixel.begin();
+
   digitalWrite(RFM95_RST, LOW);
   delay(10);
   digitalWrite(RFM95_RST, HIGH);
@@ -172,6 +179,8 @@ void setup() {
 
   while (!rf95.init()) {
     if (DEBUG) { Serial.println("[ERROR] StartUp - LoRa radio initalication failed"); }
+    pixel.setPixelColor(0, 255, 0, 0);
+    pixel.show();
     for (;;) {}
   }
   if (DEBUG) { Serial.println("[INFO] StartUp - LoRa radio initalication OK!"); }
@@ -179,6 +188,8 @@ void setup() {
   // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM
   if (!rf95.setFrequency(RF95_FREQ)) {
     if (DEBUG) { Serial.println("[ERROR] StartUp - LoRa setFrequency failed"); }
+    pixel.setPixelColor(0, 255, 0, 0);
+    pixel.show();
     for (;;) {}
   }
   if (DEBUG) { Serial.print("[INFO] StartUp - LoRa Set Freq to: "); Serial.println(RF95_FREQ); }
@@ -194,15 +205,29 @@ void setup() {
   // Air Thermometer Startup
   dht.begin();
   if (DEBUG) { Serial.println("[INFO] StartUp - Air Sensors Initialized"); }
+
+  pixel.setPixelColor(0, 0, 255, 0);
+  pixel.show();
+  delay(1000);
 }
 
 //---------------------------------------------------------------------------//
 
 uint16_t checkBattery() {
   float measuredvbat = analogRead(VBATPIN);
+  if (DEBUG) {
+    Serial.print("AnalogRead VBAT: ");
+    Serial.println(measuredvbat);
+  }
   measuredvbat *= 2;    // we divided by 2, so multiply back
   measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
-  measuredvbat /= 1024;  // convert to voltage
+  measuredvbat /= 1024.0;  // convert to voltage
+
+  if (DEBUG) {
+    Serial.print("Calculated VBAT: ");
+    Serial.println(measuredvbat);
+  }
+
   return static_cast<uint16_t>(measuredvbat*100);
 }
 
@@ -318,6 +343,9 @@ void loop() {
       packetnum++;
     }
     if (DEBUG) { Serial.println("[INFO] - Sending of message SUCCESSFUL"); }
+    pixel.setPixelColor(0, 0, 0, 255);
+    pixel.show();
+    delay(3000);
   }
 
   // Turn off the Radio
@@ -325,6 +353,8 @@ void loop() {
   rf95.sleep();
 
   digitalWrite(13, LOW);
+  pixel.clear();
+  pixel.show();
   delay(12000);  // Pause for 12 seconds before powering down.
   if (DEBUG) {
     delay(READ_INTERVAL);
