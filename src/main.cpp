@@ -18,7 +18,8 @@ Pin 6 = GPIO [DS18 / Ice Temp]
 
 Pin 9 = A7 for Battery Voltage Resistor Divider Circuit
 
-Pin 10 = GPIO
+Pin 10 = NeoPixel
+
 Pin 11 = GPIO
 Pin 12 = GPIO
 
@@ -26,10 +27,10 @@ Pin 13 = Red LED @ USB Port
 
 A0/14 = IO True Analog Output
 
-A1/15 = Analog GPIO
-A2/16 = Analog GPIO
-A3/17 = Analog GPIO
-A4/18 = Analog GPIO
+A1/15 = Analog GPIO = Switch 0
+A2/16 = Analog GPIO = Switch 1
+A3/17 = Analog GPIO = Switch 2
+A4/18 = Analog GPIO = Switch 3
 A5/19 = Analog GPIO
 
 Pin 24 = SPI SCK
@@ -39,7 +40,7 @@ Pin 22 = SPI MISO
 -------------------------------------------------------------------------
 NeoPixel
 --------
---> PIN 5
+--> PIN 10
 0.1 uF Capacitor between + and Ground of NeoPixel
 400 Ohm Resistor between Data Line and NeoPixel (Close to Pixel)
 
@@ -107,6 +108,11 @@ Error during Upload: Failed uploading: uploading error: exit status 1
 #define iceThermometerPin 6
 #define PIXEL_PIN 10
 
+#define CONFIG_SWITCH_1 A1  // LSB StationID
+#define CONFIG_SWITCH_2 A2  // MSB StationID
+#define CONFIG_SWITCH_3 A3  // GroupID
+#define CONFIG_SWITCH_4 A4  // Debug Mode
+
 // Define Frequency for LoRa Radio
 #define RF95_FREQ 433.0
 
@@ -143,7 +149,8 @@ Adafruit_NeoPixel pixel(1, PIXEL_PIN, NEO_RGB + NEO_KHZ800);
 // At one read per minute, this gives us close to 2 years uptime without rollover.
 uint16_t packetnum = 1;
 const uint8_t packetVersion = 2;
-const uint8_t myID = 3;
+uint8_t station_id = 0;
+// const uint8_t myID = 3;
 
 //---------------------------------------------------------------------------//
 //---------------------------------------------------------------------------//
@@ -158,6 +165,17 @@ void setup() {
   pinMode(airThermometerPin, INPUT);
   pinMode(iceThermometerPin, INPUT);
 
+  pinMode(CONFIG_SWITCH_1, INPUT_PULLUP);
+  pinMode(CONFIG_SWITCH_2, INPUT_PULLUP);
+  pinMode(CONFIG_SWITCH_3, INPUT_PULLUP);
+  pinMode(CONFIG_SWITCH_4, INPUT_PULLUP);
+
+  bool config_1 = digitalRead(CONFIG_SWITCH_1);
+  bool config_2 = digitalRead(CONFIG_SWITCH_2);
+  bool config_3 = digitalRead(CONFIG_SWITCH_3);
+  bool config_4 = digitalRead(CONFIG_SWITCH_4);
+
+
   if (DEBUG) {
     Serial.begin(115200);
     while (!Serial) ;;
@@ -165,10 +183,13 @@ void setup() {
 
     Serial.print("[INFO] StartUp - IceReader2 Client v"); Serial.println(VERSION);
     Serial.print("[INFO] StartUp - Packet Version v"); Serial.println(packetVersion);
+    Serial.println("[INFO] StartUp - Switch Configurations");
+    Serial.print("  [1]: "); Serial.println(config_1);
+    Serial.print("  [2]: "); Serial.println(config_2);
+    Serial.print("  [3]: "); Serial.println(config_3);
+    Serial.print("  [4]: "); Serial.println(config_4);
     Serial.print("[INFO] StartUp - Resetting LoRa Radio... ");
   }
-
-  pixel.begin();
 
   digitalWrite(RFM95_RST, LOW);
   delay(10);
@@ -176,6 +197,8 @@ void setup() {
   delay(10);
 
   if (DEBUG) { Serial.println("Done!"); }
+
+  pixel.begin();
 
   while (!rf95.init()) {
     if (DEBUG) { Serial.println("[ERROR] StartUp - LoRa radio initalication failed"); }
@@ -205,6 +228,22 @@ void setup() {
   // Air Thermometer Startup
   dht.begin();
   if (DEBUG) { Serial.println("[INFO] StartUp - Air Sensors Initialized"); }
+
+  // Define Station from Config Bits
+  station_id = (config_1)+(config_2*2);
+  // station_id = (config_1)+(config_2*2)+1;
+
+  int groupID = config_3;
+  bool debug = config_4;
+
+  if (DEBUG) {
+    Serial.print("Station ID: ");
+    Serial.println(station_id);
+    Serial.print("Group ID: ");
+    Serial.println(groupID);
+    Serial.print("debug ID: ");
+    Serial.println(debug);
+  }
 
   pixel.setPixelColor(0, 0, 255, 0);
   pixel.show();
@@ -305,7 +344,7 @@ void loop() {
   uint16_t battery = checkBattery();
 
   if (DEBUG) {
-    Serial.print("[INFO] myID: "); Serial.println(myID);
+    Serial.print("[INFO] station_id: "); Serial.println(station_id);
     Serial.print("[INFO] packetVersion: "); Serial.println(packetVersion);
     Serial.print("[INFO] packetNum: "); Serial.println(packetnum);
     Serial.print("[INFO] IceTemp: "); Serial.println(iceTempF);
@@ -316,11 +355,11 @@ void loop() {
 
   snprintf(radiopacket, sizeof(radiopacket),
   "%02u:%02u:%06u:%04u:%04u:%04u:%03u",
-  myID, packetVersion, packetnum, iceTempF, airTempF, humidity, battery);
+  station_id, packetVersion, packetnum, iceTempF, airTempF, humidity, battery);
 
   // snprintf(radiopacket, sizeof(radiopacket),
   //  "%0d:%2.1f:%06d:%04.1f:%04.1f:%04.1f:%3.2f",
-  //  myID, packetVersion, packetnum, iceTempF, airTempF, humidity, battery);
+  //  station_id, packetVersion, packetnum, iceTempF, airTempF, humidity, battery);
 
   if (DEBUG) { Serial.print("[INFO] - Message To Send: "); Serial.println(radiopacket); }
 
