@@ -367,7 +367,7 @@ void loop() {
   delay(10);
 
 //  rf95.send((uint8_t *)radiopacket, 33);
-  rf95.send(reinterpret_cast<uint8_t *>(radiopacket), 33);
+  rf95.send(reinterpret_cast<uint8_t *>(radiopacket), sizeof(radiopacket));
 
   if (DEBUG) { Serial.println("[INFO] - Waiting for Confirmation..."); }
   delay(10);
