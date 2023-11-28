@@ -229,19 +229,21 @@ void setup() {
   dht.begin();
   if (DEBUG) { Serial.println("[INFO] StartUp - Air Sensors Initialized"); }
 
+  rf95.setModeTx();
+
   // Define Station from Config Bits
-  station_id = (config_1)+(config_2*2);
-  // station_id = (config_1)+(config_2*2)+1;
+  // station_id = (config_1)+(config_2*2);
+  station_id = (config_1)+(config_2*2)+1;
 
   int groupID = config_3;
   bool debug = config_4;
 
   if (DEBUG) {
-    Serial.print("Station ID: ");
+    Serial.print("[INFO] Station ID: ");
     Serial.println(station_id);
-    Serial.print("Group ID: ");
+    Serial.print("[INFO] Group ID: ");
     Serial.println(groupID);
-    Serial.print("debug ID: ");
+    Serial.print("[INFO] debug ID: ");
     Serial.println(debug);
   }
 
@@ -255,7 +257,7 @@ void setup() {
 uint16_t checkBattery() {
   float measuredvbat = analogRead(VBATPIN);
   if (DEBUG) {
-    Serial.print("AnalogRead VBAT: ");
+    Serial.print("[INFO] AnalogRead VBAT: ");
     Serial.println(measuredvbat);
   }
   measuredvbat *= 2;    // we divided by 2, so multiply back
@@ -263,7 +265,7 @@ uint16_t checkBattery() {
   measuredvbat /= 1024.0;  // convert to voltage
 
   if (DEBUG) {
-    Serial.print("Calculated VBAT: ");
+    Serial.print("[INFO] Calculated VBAT: ");
     Serial.println(measuredvbat);
   }
 
@@ -285,7 +287,7 @@ uint16_t readIceTemp() {
   sensors.requestTemperatures();
   float value = sensors.getTempFByIndex(0);
   if (DEBUG) {
-    Serial.print("Ice Temp Value Received: ");
+    Serial.print("[INFO] Ice Temp Value Received: ");
     Serial.println(value);
   }
   if (value < 0) {
@@ -298,7 +300,7 @@ uint16_t readIceTemp() {
 uint16_t readAirTemp() {
   float value = dht.readTemperature(true);
   if (DEBUG) {
-    Serial.print("Air Temp Value Received: ");
+    Serial.print("[INFO] Air Temp Value Received: ");
     Serial.println(value);
   }
   if (isnan(value)) {
@@ -311,7 +313,7 @@ uint16_t readAirTemp() {
 uint16_t readAirHumidity() {
   float value = dht.readHumidity();
   if (DEBUG) {
-    Serial.print("Humidity Value Received: ");
+    Serial.print("INFO] Humidity Value Received: ");
     Serial.println(value);
   }
   if (isnan(value)) {
@@ -329,14 +331,11 @@ void loop() {
   // SourceID:PacketVersion:PacketNum:IceTemp:AirTemp:AirHumidity:battery
   // 00:00:000000:0000:0000:0000:000
   // 12345678901234567890123456789012
-  rf95.setModeTx();
+
   digitalWrite(13, HIGH);
 
   delay(1000);  // Wait 1 second between transmits, could also 'sleep' here!
-  if (DEBUG) { Serial.println("[INFO] -------> Starting Transmission <-------"); }
-
-  // Note: Size 32. 31 Usable. End of Array is '\0'
-  char radiopacket[32] = "00:00:000000:0000:0000:0000:000";
+  if (DEBUG) { Serial.println("[INFO] ---> Starting Gather & Transmission <---"); }
 
   uint16_t iceTempF = readIceTemp();
   uint16_t airTempF = readAirTemp();
@@ -353,9 +352,13 @@ void loop() {
     Serial.print("[INFO] Battery: "); Serial.println(battery);
   }
 
+  // Note: Size 32. 31 Usable. End of Array is '\0'
+  char radiopacket[32] = "00:00:000000:0000:0000:0000:000";
+  // char radiopacket[32];
+
   snprintf(radiopacket, sizeof(radiopacket),
-  "%02u:%02u:%06u:%04u:%04u:%04u:%03u",
-  station_id, packetVersion, packetnum, iceTempF, airTempF, humidity, battery);
+   "%02u:%02u:%06u:%04u:%04u:%04u:%03u",
+   station_id, packetVersion, packetnum, iceTempF, airTempF, humidity, battery);
 
   // snprintf(radiopacket, sizeof(radiopacket),
   //  "%0d:%2.1f:%06d:%04.1f:%04.1f:%04.1f:%3.2f",
@@ -367,6 +370,8 @@ void loop() {
   delay(10);
 
 //  rf95.send((uint8_t *)radiopacket, 33);
+//  rf95.send((uint8_t *)radiopacket, sizeof(radiopacket));
+
   rf95.send(reinterpret_cast<uint8_t *>(radiopacket), sizeof(radiopacket));
 
   if (DEBUG) { Serial.println("[INFO] - Waiting for Confirmation..."); }
