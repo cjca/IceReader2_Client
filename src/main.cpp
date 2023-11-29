@@ -122,7 +122,7 @@ Error during Upload: Failed uploading: uploading error: exit status 1
 // The default transmitter power is 13dBm, using PA_BOOST.
 // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then
 // you can set transmitter powers from 5 to 23 dBm:
-#define LORA_TRANSMIT_POWER 23
+#define LORA_TRANSMIT_POWER 13
 
 // Define Read Interval in ms
 // 10 Seconds = 10000
@@ -219,6 +219,8 @@ void setup() {
 
   // Defaults after init are 434.0MHz, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on
   rf95.setTxPower(LORA_TRANSMIT_POWER, false);
+  rf95.setModeTx();
+
   if (DEBUG) { Serial.print("[INFO] StartUp - LoRa Set TX Power to: "); Serial.println(LORA_TRANSMIT_POWER); }
 
   // Ice Thermometer Startup
@@ -228,8 +230,6 @@ void setup() {
   // Air Thermometer Startup
   dht.begin();
   if (DEBUG) { Serial.println("[INFO] StartUp - Air Sensors Initialized"); }
-
-  rf95.setModeTx();
 
   // Define Station from Config Bits
   // station_id = (config_1)+(config_2*2);
@@ -333,8 +333,8 @@ void loop() {
   // 12345678901234567890123456789012
 
   digitalWrite(13, HIGH);
+  delay(1000);  // Wait 1 second for radio to power up.
 
-  delay(1000);  // Wait 1 second between transmits, could also 'sleep' here!
   if (DEBUG) { Serial.println("[INFO] ---> Starting Gather & Transmission <---"); }
 
   uint16_t iceTempF = readIceTemp();
