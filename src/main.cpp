@@ -150,7 +150,6 @@ Adafruit_NeoPixel pixel(1, PIXEL_PIN, NEO_RGB + NEO_KHZ800);
 uint16_t packetnum = 1;
 const uint8_t packetVersion = 2;
 uint8_t station_id = 0;
-// const uint8_t myID = 3;
 
 //---------------------------------------------------------------------------//
 //---------------------------------------------------------------------------//
@@ -313,7 +312,7 @@ uint16_t readAirTemp() {
 uint16_t readAirHumidity() {
   float value = dht.readHumidity();
   if (DEBUG) {
-    Serial.print("INFO] Humidity Value Received: ");
+    Serial.print("[INFO] Humidity Value Received: ");
     Serial.println(value);
   }
   if (isnan(value)) {
@@ -333,7 +332,9 @@ void loop() {
   // 12345678901234567890123456789012
 
   digitalWrite(13, HIGH);
-  delay(1000);  // Wait 1 second for radio to power up.
+  // delay(1000);  // Wait 1 second for radio to power up.
+  // rf95.setModeIdle();
+  // delay(1000);
 
   if (DEBUG) { Serial.println("[INFO] ---> Starting Gather & Transmission <---"); }
 
@@ -376,9 +377,9 @@ void loop() {
 
   if (DEBUG) { Serial.println("[INFO] - Waiting for Confirmation..."); }
   delay(10);
-  if (!rf95.waitPacketSent()) {
-      if (DEBUG) { Serial.println("[ERROR] - Sending of message UNSUCCESSFUL"); }
-  } else {
+  // if (!rf95.waitPacketSent()) {
+  //    if (DEBUG) { Serial.println("[ERROR] - Sending of message UNSUCCESSFUL"); }
+  // } else {
     // Our Packet number is included in the sent packet.  We only leave room
     // for 6 numbers.  This resets it to keep the packet from overflowing.
     if (packetnum >= 999999) {
@@ -390,7 +391,7 @@ void loop() {
     pixel.setPixelColor(0, 0, 0, 255);
     pixel.show();
     delay(3000);
-  }
+  // }
 
   // Turn off the Radio
   if (DEBUG) { Serial.println("[INFO] - Powering Down Radio"); }
