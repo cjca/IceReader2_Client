@@ -6,13 +6,13 @@ All Rights Reserved
 #ifndef SRC_MAIN_H_
 #define SRC_MAIN_H_
 
-#define VERSION 1.0
+#define VERSION 1.2
 #define DEBUG 0
 
-float checkBattery();
+uint16_t checkBattery();
 void powerDown();
-float readIceTemp();
-float readAirTemp();
-float readAirHumidity();
+uint16_t readIceTemp();
+uint16_t readAirTemp();
+uint16_t readAirHumidity();
 
 #endif  // SRC_MAIN_H_
