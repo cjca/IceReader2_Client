@@ -16,12 +16,13 @@ Pin 21 = I2C SCL (Pull Up with 5K Resistor)
 Pin 5 = GPIO [DHT11 / Air Temp & Humidity]
 Pin 6 = GPIO [DS18 / Ice Temp]
 
+Pin 8 = [INTERNAL ONLY] = Radio CS Pin. Set HIGH when not using Radio.
 Pin 9 = A7 for Battery Voltage Resistor Divider Circuit
 
 Pin 10 = NeoPixel
 
-Pin 11 = GPIO
-Pin 12 = GPIO
+Pin 11 = GPIO [CS for SD Card Reader?]
+Pin 12 = GPIO [Card Detect for Card Reader?]
 
 Pin 13 = Red LED @ USB Port
 
@@ -33,6 +34,7 @@ A3/17 = Analog GPIO = Switch 2
 A4/18 = Analog GPIO = Switch 3
 A5/19 = Analog GPIO
 
+# We need Pull Ups on these?
 Pin 24 = SPI SCK
 Pin 23 = SPI MOSI
 Pin 22 = SPI MISO
@@ -246,7 +248,7 @@ void setup() {
     Serial.println(debug);
   }
 
-  pixel.setPixelColor(0, 0, 255, 0);
+  pixel.setPixelColor(0, 255, 0, 0);
   pixel.show();
   delay(1000);
 }
@@ -367,6 +369,15 @@ void loop() {
 
   if (DEBUG) { Serial.print("[INFO] - Message To Send: "); Serial.println(radiopacket); }
 
+  if (iceTempF < 27) {
+    if (DEBUG) { Serial.print("[INFO] Ice Temp < 27, Blue Pixel"); }
+  } else if (iceTempF <= 29) {
+    if (DEBUG) { Serial.print("[INFO] Ice Temp < 29, Yelow Pixel"); }
+  } else {
+      if (DEBUG) { Serial.print("[INFO] Ice Temp > 29, Red Pixel"); }
+  }
+
+
   if (DEBUG) { Serial.println("[INFO] - Sending..."); }
   delay(10);
 
@@ -388,8 +399,8 @@ void loop() {
       packetnum++;
     }
     if (DEBUG) { Serial.println("[INFO] - Sending of message SUCCESSFUL"); }
-    pixel.setPixelColor(0, 0, 0, 255);
-    pixel.show();
+    //pixel.setPixelColor(0, 0, 0, 255);
+    //pixel.show();
     delay(3000);
   // }
 
