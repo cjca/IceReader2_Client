@@ -35,6 +35,7 @@ A4/18 = Analog GPIO = Switch 3
 A5/19 = Analog GPIO
 
 # We need Pull Ups on these?
+Pin 11 = SPI CS
 Pin 24 = SPI SCK
 Pin 23 = SPI MOSI
 Pin 22 = SPI MISO
@@ -95,6 +96,7 @@ Error during Upload: Failed uploading: uploading error: exit status 1
 #include <RTCZero.h>
 #include <ArduinoLowPower.h>
 #include <DHT.h>
+#include <SD.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <Adafruit_NeoPixel.h>
@@ -105,10 +107,17 @@ Error during Upload: Failed uploading: uploading error: exit status 1
 #define RFM95_INT   3
 #define RFM95_RST   4
 
+#define SD_CS       11
+#define SD_MOSI     23
+#define SD_SCK      24
+#define SD_MISO     22
+
 #define VBATPIN A7
 #define airThermometerPin 5
 #define iceThermometerPin 6
 #define PIXEL_PIN 10
+
+#define LED_PIN 13
 
 #define CONFIG_SWITCH_1 A1  // LSB StationID
 #define CONFIG_SWITCH_2 A2  // MSB StationID
@@ -152,16 +161,22 @@ Adafruit_NeoPixel pixel(1, PIXEL_PIN, NEO_RGB + NEO_KHZ800);
 uint16_t packetnum = 1;
 const uint8_t packetVersion = 2;
 uint8_t station_id = 0;
+uint8_t iceSensorCount = 0;
+/*
+bool log_to_SD = false;
+
+File SDlogFile;
+*/
 
 //---------------------------------------------------------------------------//
 //---------------------------------------------------------------------------//
 
 void setup() {
-  pinMode(13, OUTPUT);
-  digitalWrite(13, HIGH);
+  // Set Pin Types
+  pinMode(LED_PIN, OUTPUT);
 
+  pinMode(SD_CS, OUTPUT);
   pinMode(RFM95_RST, OUTPUT);
-  digitalWrite(RFM95_RST, HIGH);
 
   pinMode(airThermometerPin, INPUT);
   pinMode(iceThermometerPin, INPUT);
@@ -171,33 +186,75 @@ void setup() {
   pinMode(CONFIG_SWITCH_3, INPUT_PULLUP);
   pinMode(CONFIG_SWITCH_4, INPUT_PULLUP);
 
-  bool config_1 = digitalRead(CONFIG_SWITCH_1);
-  bool config_2 = digitalRead(CONFIG_SWITCH_2);
-  bool config_3 = digitalRead(CONFIG_SWITCH_3);
-  bool config_4 = digitalRead(CONFIG_SWITCH_4);
-
+  // Turn LED On
+  digitalWrite(LED_PIN, HIGH);
 
   if (DEBUG) {
     Serial.begin(115200);
     while (!Serial) ;;
     delay(100);
+  }
 
+  // Turn on the SD Card / Turn off the Radio
+  /* enableSD();
+
+  if (SD.begin(SD_CS)) {
+    if (DEBUG) {
+      Serial.println("[INFO] SD Card Found.");
+    }
+    SDlogFile = SD.open("log.txt", FILE_WRITE);
+    log_to_SD = true;
+  } else {
+    if (DEBUG) {
+      Serial.println("[INFO] SD Card Not Found.");
+      Serial.println("[INFO] We will only log to Console with DEBUG Set.");
+    }
+  }
+  */
+
+  bool config_1 = digitalRead(CONFIG_SWITCH_1);
+  bool config_2 = digitalRead(CONFIG_SWITCH_2);
+  bool config_3 = digitalRead(CONFIG_SWITCH_3);
+  bool config_4 = digitalRead(CONFIG_SWITCH_4);
+
+  if (DEBUG) {
     Serial.print("[INFO] StartUp - IceReader2 Client v"); Serial.println(VERSION);
     Serial.print("[INFO] StartUp - Packet Version v"); Serial.println(packetVersion);
     Serial.println("[INFO] StartUp - Switch Configurations");
-    Serial.print("  [1]: "); Serial.println(config_1);
-    Serial.print("  [2]: "); Serial.println(config_2);
-    Serial.print("  [3]: "); Serial.println(config_3);
-    Serial.print("  [4]: "); Serial.println(config_4);
+    Serial.print("[INFO]  [Sw 1]: "); Serial.println(config_1);
+    Serial.print("[INFO]  [Sw 2]: "); Serial.println(config_2);
+    Serial.print("[INFO]  [Sw 3]: "); Serial.println(config_3);
+    Serial.print("[INFO]  [Sw 4]: "); Serial.println(config_4);
     Serial.print("[INFO] StartUp - Resetting LoRa Radio... ");
   }
 
-  digitalWrite(RFM95_RST, LOW);
-  delay(10);
-  digitalWrite(RFM95_RST, HIGH);
-  delay(10);
+  /*
+  enableSD();
 
-  if (DEBUG) { Serial.println("Done!"); }
+  SDlogFile.print("[INFO] StartUp - IceReader2 Client v");
+  SDlogFile.println(VERSION);
+  SDlogFile.print("[INFO] StartUp - Packet Version v");
+  SDlogFile.println(packetVersion);
+  SDlogFile.println("[INFO] StartUp - Switch Configurations");
+  SDlogFile.print("[INFO]  [Sw 1]: "); SDlogFile.println(config_1);
+  SDlogFile.print("[INFO]  [Sw 2]: "); SDlogFile.println(config_2);
+  SDlogFile.print("[INFO]  [Sw 3]: "); SDlogFile.println(config_3);
+  SDlogFile.print("[INFO]  [Sw 4]: "); SDlogFile.println(config_4);
+  SDlogFile.print("[INFO] StartUp - Resetting LoRa Radio... ");
+  */
+
+  // Turn LED Off
+  digitalWrite(LED_PIN, LOW);
+
+
+  enableRadio();
+  resetRadio();
+
+  /*
+  enableSD();
+  SDlogFile.println("Done!");
+  */
+
 
   pixel.begin();
 
@@ -227,6 +284,11 @@ void setup() {
   // Ice Thermometer Startup
   sensors.begin();
   if (DEBUG) { Serial.println("[INFO] StartUp - Ice Sensors Initialized"); }
+  iceSensorCount = sensors.getDeviceCount();
+  if (DEBUG) {
+    Serial.print("[INFO] Ice Sensors Count = ");
+    Serial.println(iceSensorCount);
+  }
 
   // Air Thermometer Startup
   dht.begin();
@@ -248,12 +310,45 @@ void setup() {
     Serial.println(debug);
   }
 
+  // Blink Quickly for Init
+  blinky(5, 100, 50);
+
+  // Blink Station ID
+  blinky(station_id, 100, 500);
+
+
   pixel.setPixelColor(0, 255, 0, 0);
   pixel.show();
   delay(1000);
 }
 
 //---------------------------------------------------------------------------//
+
+// Chip Select (CS) is Active Low.  Pull it low to active the SPI line.
+
+void enableRadio() {
+  delay(10);
+  if (DEBUG) { Serial.println("[INFO] Enabling Radio / Disabling SD Card"); }
+  digitalWrite(RFM95_CS, LOW);
+  delay(10);
+  digitalWrite(SD_CS, HIGH);
+}
+
+void resetRadio() {
+  digitalWrite(RFM95_RST, LOW);
+  delay(10);
+  digitalWrite(RFM95_RST, HIGH);
+  delay(10);
+}
+
+void enableSD() {
+  delay(10);
+  if (DEBUG) { Serial.println("[INFO] Enabling SD Card / Disabling Radio"); }
+  digitalWrite(RFM95_CS, HIGH);
+  delay(10);
+  digitalWrite(SD_CS, LOW);
+  delay(10);
+}
 
 uint16_t checkBattery() {
   float measuredvbat = analogRead(VBATPIN);
@@ -273,10 +368,20 @@ uint16_t checkBattery() {
   return static_cast<uint16_t>(measuredvbat*100);
 }
 
+void blinky(int times, int on_delay, int off_delay) {
+  for (int x = 0; x <= times; x++) {
+    digitalWrite(LED_PIN, HIGH);
+    delay(on_delay);
+    digitalWrite(LED_PIN, LOW);
+    delay(off_delay);
+  }
+}
+
 //---------------------------------------------------------------------------//
 
 void powerDown() {
   if (DEBUG) { Serial.println("[INFO] - Powering Down Microcontroller"); }
+  /* SDlogFile.close(); */
   digitalWrite(13, LOW);
   LowPower.deepSleep(READ_INTERVAL);
   //  LowPower.sleep(READ_INTERVAL);
@@ -286,15 +391,29 @@ void powerDown() {
 
 uint16_t readIceTemp() {
   sensors.requestTemperatures();
-  float value = sensors.getTempFByIndex(0);
-  if (DEBUG) {
-    Serial.print("[INFO] Ice Temp Value Received: ");
-    Serial.println(value);
+  float totalValue = 0.0;
+  for (int x=0; x < iceSensorCount; x++) {
+    float value = sensors.getTempFByIndex(x);
+    totalValue = value + totalValue;
+    if (DEBUG) {
+      Serial.print("[INFO] Ice Temp Value Received from Sensor ");
+      Serial.print(x);
+      Serial.print(" :");
+      Serial.println(value);
+      Serial.print("[INFO] Cumulative Value from Sensors: ");
+      Serial.println(totalValue);
+    }
   }
-  if (value < 0) {
+  float averageValue = totalValue/iceSensorCount;
+  if (DEBUG) {
+    Serial.print("[INFO] Average Ice Temp Received: ");
+    Serial.println(averageValue);
+  }
+
+  if (averageValue < 0) {
     return 0;
   } else {
-    return static_cast<uint16_t>(value*100);
+    return static_cast<uint16_t>(averageValue*100);
   }
 }
 
@@ -345,6 +464,14 @@ void loop() {
   uint16_t humidity = readAirHumidity();
   uint16_t battery = checkBattery();
 
+  if (iceTempF < 27) {
+    if (DEBUG) { Serial.println("[INFO] Ice Temp < 27, Blue Pixel"); }
+  } else if (iceTempF <= 29) {
+    if (DEBUG) { Serial.println("[INFO] Ice Temp < 29, Yelow Pixel"); }
+  } else {
+      if (DEBUG) { Serial.println("[INFO] Ice Temp > 29, Red Pixel"); }
+  }
+
   if (DEBUG) {
     Serial.print("[INFO] station_id: "); Serial.println(station_id);
     Serial.print("[INFO] packetVersion: "); Serial.println(packetVersion);
@@ -368,16 +495,6 @@ void loop() {
   //  station_id, packetVersion, packetnum, iceTempF, airTempF, humidity, battery);
 
   if (DEBUG) { Serial.print("[INFO] - Message To Send: "); Serial.println(radiopacket); }
-
-  if (iceTempF < 27) {
-    if (DEBUG) { Serial.print("[INFO] Ice Temp < 27, Blue Pixel"); }
-  } else if (iceTempF <= 29) {
-    if (DEBUG) { Serial.print("[INFO] Ice Temp < 29, Yelow Pixel"); }
-  } else {
-      if (DEBUG) { Serial.print("[INFO] Ice Temp > 29, Red Pixel"); }
-  }
-
-
   if (DEBUG) { Serial.println("[INFO] - Sending..."); }
   delay(10);
 
@@ -399,8 +516,8 @@ void loop() {
       packetnum++;
     }
     if (DEBUG) { Serial.println("[INFO] - Sending of message SUCCESSFUL"); }
-    //pixel.setPixelColor(0, 0, 0, 255);
-    //pixel.show();
+    // pixel.setPixelColor(0, 0, 0, 255);
+    // pixel.show();
     delay(3000);
   // }
 
