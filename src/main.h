@@ -6,8 +6,9 @@ All Rights Reserved
 #ifndef SRC_MAIN_H_
 #define SRC_MAIN_H_
 
-#define VERSION 1.4
-#define DEBUG 0
+#define VERSION 1.5
+#define DEBUG 1
+#define BREAK_ON_DEBUG 0
 
 uint16_t checkBattery();
 void powerDown();

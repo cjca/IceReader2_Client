@@ -191,8 +191,10 @@ void setup() {
 
   if (DEBUG) {
     Serial.begin(115200);
-    while (!Serial) ;;
-    delay(100);
+    if (BREAK_ON_DEBUG) {
+      while (!Serial) ;;
+      delay(100);
+    }
   }
 
   // Turn on the SD Card / Turn off the Radio
@@ -391,7 +393,7 @@ void powerDown() {
 
 uint16_t readIceTemp() {
   sensors.requestTemperatures();
-  float totalValue = 0.0;
+    float totalValue = 0.0;
   for (int x=0; x < iceSensorCount; x++) {
     float value = sensors.getTempFByIndex(x);
     totalValue = value + totalValue;
@@ -410,7 +412,7 @@ uint16_t readIceTemp() {
     Serial.println(averageValue);
   }
 
-  if (averageValue < 0) {
+  if (averageValue < 0 || isnan(averageValue)) {
     return 0;
   } else {
     return static_cast<uint16_t>(averageValue*100);
@@ -486,9 +488,17 @@ void loop() {
   char radiopacket[32] = "00:00:000000:0000:0000:0000:000";
   // char radiopacket[32];
 
-  snprintf(radiopacket, sizeof(radiopacket),
+  int8_t checkLength = snprintf(radiopacket, sizeof(radiopacket),
    "%02u:%02u:%06u:%04u:%04u:%04u:%03u",
    station_id, packetVersion, packetnum, iceTempF, airTempF, humidity, battery);
+
+  if (checkLength >= sizeof(radiopacket) || checkLength < 0) {
+    if (DEBUG) {
+      Serial.println("[ERROR] - snprintf overrun of radiopacket array");
+      Serial.print("[ERROR] - snprintf returned length of: "); Serial.println(checkLength);
+      Serial.print("[ERROR] - radiopacket size is: "); Serial.println(sizeof(radiopacket));
+    }
+  }
 
   // snprintf(radiopacket, sizeof(radiopacket),
   //  "%0d:%2.1f:%06d:%04.1f:%04.1f:%04.1f:%3.2f",
